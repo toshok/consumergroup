@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package consumergroup;
+
+message JoinGroupRequest {
+  string member_id = 1;
+
+  // once we have multiple groups to join, add this.  should maybe be a string too?
+  // int32 consumer_group_id = 1;
+}
+
+message JoinGroupResponse {
+  string leader_id = 2; // not really used by anything.  could be replaced with 'bool is_leader'
+
+  // The remaining fields are only used by the leader
+  repeated string members = 3;
+  repeated int32 partitions = 4;
+  string assignment_strategy = 5;
+  int32 generation = 6;
+}
+
+message SyncGroupRequest {
+  string member_id = 1;
+  map<string, Assignment> assignments = 2; // Only sent by the leader
+}
+
+message SyncGroupResponse {
+  Assignment assignment = 1; // The assignment assigned to this member
+}
+
+message Assignment {
+  repeated int32 partitions = 1;
+}
+
+message HeartbeatRequest {
+  string member_id = 1;
+  int32 generation = 5;
+}
+
+message HeartbeatResponse {
+  bool success = 1;
+  int32 generation = 2;
+}
+
+message LeaveGroupRequest {
+  string member_id = 1;
+}
+
+message LeaveGroupResponse {
+  bool success = 1;
+}
+
+
+service ConsumerCoordinator {
+  rpc JoinGroup(JoinGroupRequest) returns (JoinGroupResponse);
+  rpc SyncGroup(SyncGroupRequest) returns (SyncGroupResponse);
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc LeaveGroup(LeaveGroupRequest) returns (LeaveGroupResponse);
+}
