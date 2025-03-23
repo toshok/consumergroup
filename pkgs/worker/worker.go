@@ -25,6 +25,7 @@ type AssignedPartitionsFunc func(assignedPartitions []types.PartitionID)
 type Worker struct {
 	id                string // our id
 	leaderId          string // our leader's id (will be == id for the leader)
+	conn              *grpc.ClientConn
 	client            pb.ConsumerCoordinatorClient
 	partitionsChanged AssignedPartitionsFunc
 
@@ -39,15 +40,21 @@ type Worker struct {
 	logger          zerolog.Logger
 }
 
-func New(conn *grpc.ClientConn, partitionsChanged AssignedPartitionsFunc) *Worker {
+func New(coordinatorAddress string, partitionsChanged AssignedPartitionsFunc) (*Worker, error) {
+	conn, err := grpc.Dial(coordinatorAddress, grpc.WithInsecure())
+	if err != nil {
+		return nil, err
+	}
+
 	id := uuid.New().String()
 	return &Worker{
 		id:                uuid.New().String(),
 		logger:            log.With().Str("worker_id", id).Logger(),
+		conn:              conn,
 		client:            pb.NewConsumerCoordinatorClient(conn),
 		partitionsChanged: partitionsChanged,
 		prevAssignments:   make(map[string][]types.PartitionID),
-	}
+	}, nil
 }
 
 func (w *Worker) joinGroup() error {
@@ -157,11 +164,16 @@ func (w *Worker) sendHeartbeat() {
 	}
 }
 
-func (w *Worker) Run() {
+func (w *Worker) Start() {
 	w.logger.Debug().Msg("Started running")
 	if err := w.joinGroup(); err != nil {
 		w.logger.Fatal().Err(err).Msg("Failed to join group")
 	}
 
 	go w.sendHeartbeat()
+}
+
+func (w *Worker) Stop() {
+	w.logger.Debug().Msg("Stopping")
+	w.conn.Close()
 }

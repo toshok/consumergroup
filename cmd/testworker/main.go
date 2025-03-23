@@ -4,8 +4,6 @@ import (
 	"os"
 	"time"
 
-	"google.golang.org/grpc"
-
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -20,14 +18,12 @@ func partitionsChanged(partitions []types.PartitionID) {
 func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-	conn, err := grpc.Dial("localhost:50051", grpc.WithInsecure())
+	worker, err := worker.New("localhost:50051", partitionsChanged)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to connect to coordinator")
 	}
-	defer conn.Close()
 
-	worker := worker.New(conn, partitionsChanged)
-	worker.Run()
+	go worker.Start()
 
 	for {
 		// do nothing forever
